@@ -1,20 +1,25 @@
 name: CI
 
-on: [push, pull_request]
+on:
+  push:
+  pull_request:
 
 jobs:
   test:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
       - name: Set up Python
         uses: actions/setup-python@v4
         with:
-          python-version: '3.12'
+          python-version: "3.12"
+
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
+
       - name: Validate syntax
         run: |
           python -m py_compile app.py
@@ -26,29 +31,18 @@ jobs:
           python -m py_compile app/utils/config_manager.py
           python -m py_compile app/utils/preflight.py
           python -m py_compile app/utils/logging_service.py
+
       - name: Import check
         run: |
-          python -c "import app; print('✓ app import ok')"
-          python -c "from app.utils import config, preflight; print('✓ utils import ok')"
-          python -c "from app.services import OpenAIService; print('✓ services import ok')"
+          python -c "import app; print('app import ok')"
+          python -c "from app.utils import config, preflight; print('utils import ok')"
+          python -c "from app.services import OpenAIService; print('services import ok')"
+
       - name: Run tests
-        run: |
-          pytest tests/ -v
+        run: pytest tests/ -v
 
       - name: Validate Docker build
-        run: |
-          docker build -t financial-nebula-node:test .
+        run: docker build -t finance_app_for_aws:ci-test .
 
-      - name: Log in to Docker Hub
-        if: github.ref == 'refs/heads/deployable'
-        uses: docker/login-action@v3
-        with:
-          username: ${{ secrets.DOCKERHUB_USERNAME }}
-          password: ${{ secrets.DOCKERHUB_TOKEN }}
-
-      - name: Build and push Docker image to Docker Hub
-        if: github.ref == 'refs/heads/deployable'
-        run: |
-          docker build -t taig2k/financial-nebula-node:latest -t taig2k/financial-nebula-node:${{ github.sha }} .
-          docker push taig2k/financial-nebula-node:latest
-          docker push taig2k/financial-nebula-node:${{ github.sha }}
+      # Docker Hub publish is handled by .github/workflows/docker-publish.yml
+      # on push to main and manual workflow_dispatch only.

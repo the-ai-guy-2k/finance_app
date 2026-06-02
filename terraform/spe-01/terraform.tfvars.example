@@ -1,0 +1,32 @@
+# SPE-01 Terraform variables — copy to terraform.tfvars and customize.
+# Do NOT commit terraform.tfvars if it contains secrets or restrictive CIDRs.
+
+aws_profile = "nebula"
+aws_region  = "us-east-1"
+
+project_name = "financial-app"
+environment  = "spe-01"
+
+# Free-tier eligible instance type
+instance_type = "t2.micro"
+
+# Small root volume (gp3, encrypted)
+root_volume_size_gb = 8
+
+# Required: existing EC2 key pair name in us-east-1
+ssh_key_name = "your-ec2-key-pair-name"
+
+# Restrict SSH to your IP for better security (example: "203.0.113.10/32")
+ssh_allowed_cidrs = ["0.0.0.0/0"]
+
+# HTTP access for demo (0.0.0.0/0 allows any browser)
+http_allowed_cidrs = ["0.0.0.0/0"]
+
+# Docker Hub image published from main via docker-publish.yml
+docker_image = "taig2k/finance_app_for_aws:latest"
+
+# Do NOT put your OpenAI API key in this file.
+# Pass at apply time instead:
+#   export TF_VAR_openai_api_key="sk-..."
+# or:
+#   terraform apply -var="openai_api_key=sk-..."

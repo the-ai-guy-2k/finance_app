@@ -61,7 +61,7 @@ This project is containerized with support for local development and automated D
 
 Build the image locally:
 ```powershell
-docker build -t financial-nebula-node:local .
+docker build -t finance_app_for_aws:local .
 ```
 
 Run the container with a mounted config file and OpenAI key:
@@ -69,19 +69,42 @@ Run the container with a mounted config file and OpenAI key:
 docker run --rm -p 5000:5000 `
   -v "%cd%\config.docker.json:/app/config.json" `
   -v "C:\Users\tim\Desktop\openai_key_for_financial_app.txt:/run/secrets/openai_key.txt" `
-  financial-nebula-node:local
+  finance_app_for_aws:local
 ```
 
 Then open: http://127.0.0.1:5000
 
-### Automated Docker Hub Publishing
+### Automated Docker Hub Publishing (CI/CD)
 
-- **Image Location:** `taig2k/financial-nebula-node`
-- **Feature branches:** Build Docker image for CI validation only (no push)
-- **Deployable branch:** Automatically build and publish image to Docker Hub on merge
-- **Image tags:** `latest` (current) and commit SHA (immutable)
+Two workflows provide a single CI/CD story for SPE-01:
 
-See [DOCKER_USAGE.md](docs/DOCKER_USAGE.md) for detailed instructions and troubleshooting.
+| Workflow | File | Trigger | Purpose |
+|----------|------|---------|---------|
+| **CI** | [`.github/workflows/ci.yml`](.github/workflows/ci.yml) | Push, pull request | Syntax, imports, pytest, Docker build validation (no push) |
+| **Docker Publish** | [`.github/workflows/docker-publish.yml`](.github/workflows/docker-publish.yml) | Push to `main`, manual dispatch | Test, build, push to Docker Hub |
+
+| Item | Value |
+|------|-------|
+| **Purpose** | Build and push the Financial App image for AWS SPE-01 Terraform deployment |
+| **Docker Hub image** | `taig2k/finance_app_for_aws` |
+| **Tags pushed** | `latest`, `<commit-sha>` |
+| **Publish triggers** | Push to `main`, manual `workflow_dispatch` |
+| **Required GitHub secrets** | `DOCKERHUB_USERNAME`, `DOCKERHUB_TOKEN` |
+
+**Publish workflow behavior (`docker-publish.yml`):**
+
+1. Validates `requirements.txt` exists
+2. Runs existing pytest suite
+3. Builds the Docker image with Buildx
+4. Pushes `taig2k/finance_app_for_aws:latest` and `taig2k/finance_app_for_aws:<commit-sha>` to Docker Hub
+
+**SPE-01 relationship:** Terraform artifact [`terraform/spe-01/`](terraform/spe-01/) pulls `taig2k/finance_app_for_aws:latest` onto EC2 at bootstrap. Publish to Docker Hub from `main` before running SPE-01 `terraform apply`.
+
+**Legacy cleanup (CI/CD-02):** Removed Docker Hub push from `ci.yml`. An earlier pipeline published `taig2k/financial-nebula-node` on merges to a `deployable` branch; that path is retired. `docker-publish.yml` on `main` is the sole publish path.
+
+Credentials are stored only as GitHub Actions secrets — never hardcoded in workflows or the repository.
+
+See [DOCKER_USAGE.md](docs/DOCKER_USAGE.md) for local Docker usage and troubleshooting.
 
 ## Docs
 

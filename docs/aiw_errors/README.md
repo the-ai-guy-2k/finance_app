@@ -100,28 +100,31 @@ When ANY failure occurs in the pipeline:
 
 ## Docker Hub Publishing Pipeline
 
-This folder is created as part of validating the complete CI/CD pipeline:
+Current CI/CD flow for SPE-01:
 
 ```
-feature branch
-  → validation
-  → merge to deployable
-  → GitHub Actions
+feature branch / pull request
+  → ci.yml (syntax, tests, Docker build validation — no push)
+  → merge to main
+  → docker-publish.yml
   → tests
   → Docker build
   → Docker Hub login
   → Docker Hub push (latest + commit SHA tags)
 ```
 
-**Docker Hub Target**: `taig2k/financial-nebula-node`
+**Docker Hub Target**: `taig2k/finance_app_for_aws`
 
 **Required Tags**:
-- `latest` (points to most recent build)
+- `latest` (points to most recent build from `main`)
 - `<commit-sha>` (specific commit identifier)
+
+Legacy note: Earlier pipeline used `deployable` branch and `taig2k/financial-nebula-node`. Retired in CI/CD-02.
 
 ## Related Documentation
 
-- [CI Workflow](.github/workflows/ci.yml)
+- [CI Workflow](../.github/workflows/ci.yml)
+- [Docker Publish Workflow](../.github/workflows/docker-publish.yml)
 - [Dockerfile](../../Dockerfile)
 - [Docker Configuration](../../config.docker.example.json)
 - [Docker Usage Guide](../DOCKER_USAGE.md)
