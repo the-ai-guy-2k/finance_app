@@ -37,14 +37,32 @@ class OpenAIService:
 
     def generate_insights(self, transactions):
         """Generate behavioral insights from transactions using OpenAI or heuristics."""
+        from app.utils.dashboard_stats import build_insights_context
+
+        context = build_insights_context(transactions)
         client = self._get_client()
         if client and self.api_key:
             try:
-                prompt = f"""Generate brief behavioral financial insights from these transactions (max 200 words):
-{json.dumps(transactions)[:4000]}
+                prompt = f"""Generate brief behavioral financial insights from these transactions (max 200 words).
+
+Transactions sample:
+{json.dumps(context.get('transactions', [])[:20])[:3000]}
+
+Category totals (parent transactions):
+{json.dumps(context.get('category_totals', {}))}
+
+Line-item category totals (from receipts):
+{json.dumps(context.get('line_category_totals', {}))}
+
+Receipt summaries:
+{json.dumps(context.get('receipt_summaries', []))[:1500]}
+
+Total spend: {context.get('total_spend', 0)}
+Receipt count: {context.get('receipt_count', 0)}
 
 Focus on:
-- spending patterns
+- spending patterns by category
+- receipt vs manual entry patterns
 - behavioral observations
 - actionable insights"""
 
@@ -59,26 +77,22 @@ Focus on:
             except Exception as e:
                 log_error(ErrorCategory.OPENAI_API_ERROR, "Insight generation failed", e)
 
-        total = 0.0
-        count = 0
-        categories = {}
-        for t in transactions:
-            try:
-                amt = float(t.get('amount') or 0)
-                total += amt
-                count += 1
-                cat = t.get('category', 'uncategorized')
-                categories[cat] = categories.get(cat, 0) + 1
-            except Exception:
-                continue
+        total = context.get('total_spend', 0.0)
+        count = len(transactions or [])
+        categories = context.get('category_totals', {})
+        line_cats = context.get('line_category_totals', {})
+        receipt_count = context.get('receipt_count', 0)
 
         avg = (total / count) if count else 0
         top_cat = max(categories, key=categories.get) if categories else 'none'
+        top_line = max(line_cats, key=line_cats.get) if line_cats else 'none'
 
         return f"""Financial Overview (heuristic):
 - Transactions: {count}
 - Total: ${total:.2f}
 - Average: ${avg:.2f}
 - Top category: {top_cat}
+- Receipt-derived transactions: {receipt_count}
+- Top line-item category: {top_line}
 
 Note: Full insights require OpenAI API access."""

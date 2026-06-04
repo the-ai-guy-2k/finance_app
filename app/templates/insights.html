@@ -2,6 +2,18 @@
 {% block content %}
 <h2>Behavioral Insights</h2>
 
+{% if summaries and summaries.category_rows %}
+  <section class="summary-panel" style="margin-bottom: 1rem; padding: 1rem; background: #f9fafb; border-radius: 8px;">
+    <h3>Category context</h3>
+    <p>Receipt transactions: {{ summaries.receipt_count }} | Total spend: ${{ "%.2f"|format(summaries.total_spend) }}</p>
+    <ul>
+      {% for row in summaries.category_rows[:8] %}
+        <li>{{ category_label(row.slug) }}: ${{ "%.2f"|format(row.total) }}</li>
+      {% endfor %}
+    </ul>
+  </section>
+{% endif %}
+
 <section>
   <h3>Analysis</h3>
   {% if insights %}

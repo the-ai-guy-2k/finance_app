@@ -2,6 +2,34 @@
 {% block content %}
 <h2>Dashboard</h2>
 
+{% if summaries %}
+  <section class="summary-panel">
+    <h3>Spending Summary</h3>
+    <div class="summary-grid">
+      <div class="summary-card">
+        <span class="summary-label">Total spend</span>
+        <span class="summary-value">${{ "%.2f"|format(summaries.total_spend) }}</span>
+      </div>
+      <div class="summary-card">
+        <span class="summary-label">Receipt transactions</span>
+        <span class="summary-value">{{ summaries.receipt_count }}</span>
+      </div>
+      <div class="summary-card">
+        <span class="summary-label">Receipt spend</span>
+        <span class="summary-value">${{ "%.2f"|format(summaries.receipt_spend) }}</span>
+      </div>
+    </div>
+    {% if summaries.category_rows %}
+      <h4>By category</h4>
+      <ul class="category-summary-list">
+        {% for row in summaries.category_rows %}
+          <li><span class="category-badge">{{ category_label(row.slug) }}</span> ${{ "%.2f"|format(row.total) }}</li>
+        {% endfor %}
+      </ul>
+    {% endif %}
+  </section>
+{% endif %}
+
 {% if goals %}
   <section>
     <h3>Savings Goals</h3>
@@ -28,6 +56,7 @@
             <th>Merchant</th>
             <th>Category</th>
             <th>Amount</th>
+            <th>Source</th>
             <th>Note</th>
           </tr>
         </thead>
@@ -37,9 +66,16 @@
               <td>{{ t.date or 'N/A' }}</td>
               <td><strong>{{ t.merchant }}</strong></td>
               <td>
-                <span class="category-badge">{{ t.category }}</span>
+                <span class="category-badge">{{ category_label(t.category) if category_label is defined else t.category }}</span>
               </td>
               <td class="amount-cell">${{ "%.2f"|format(t.amount|float) if t.amount else '0.00' }}</td>
+              <td>
+                {% if t.source == 'receipt' %}
+                  <span class="category-badge">Receipt{% if t.line_items %} ({{ t.line_items|length }} items){% endif %}</span>
+                {% else %}
+                  —
+                {% endif %}
+              </td>
               <td class="note-cell">{{ t.note or '—' }}</td>
             </tr>
           {% endfor %}
@@ -129,5 +165,48 @@
 
 .no-data a:hover {
   text-decoration: underline;
+}
+
+.summary-panel {
+  margin-bottom: 1.5rem;
+  padding: 1rem;
+  background: #f9fafb;
+  border-radius: 8px;
+  border: 1px solid #e5e7eb;
+}
+
+.summary-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 1rem;
+}
+
+.summary-card {
+  background: #fff;
+  border: 1px solid #ddd6fe;
+  border-radius: 8px;
+  padding: 0.75rem 1rem;
+}
+
+.summary-label {
+  display: block;
+  font-size: 0.85rem;
+  color: #6b7280;
+}
+
+.summary-value {
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: #6d28d9;
+}
+
+.category-summary-list {
+  list-style: none;
+  padding: 0;
+  margin: 0.5rem 0 0 0;
+}
+
+.category-summary-list li {
+  margin: 0.35rem 0;
 }
 </style>

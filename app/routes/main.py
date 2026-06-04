@@ -1,17 +1,28 @@
-from flask import Blueprint, render_template, request, redirect, url_for, flash, current_app
+from flask import Blueprint, render_template, request, redirect, url_for, flash, current_app, send_from_directory
 from werkzeug.utils import secure_filename
 import os
-from app.utils.storage import load_transactions, save_transactions, get_default_goals, reset_demo_data
+from app.utils.storage import (
+    load_transactions,
+    save_transactions,
+    get_default_goals,
+    reset_demo_data,
+    save_pending_receipt,
+    get_pending_receipt,
+    remove_pending_receipt,
+    save_receipt_archive,
+)
 from app.utils.normalize import normalize_transaction
 from app.utils.config_manager import config
+from app.utils.dashboard_stats import compute_dashboard_summaries
+from app.utils.receipt_categories import CATEGORY_SLUGS, category_label
 from app.services.openai_service import OpenAIService
-from app.services.openai_receipt_service import OpenAIReceiptParsingService
+from app.services.receipt_intelligence_service import ReceiptIntelligenceService
 from app.utils.logging_service import log_error, log_info, ErrorCategory
 
 bp = Blueprint('main', __name__)
 
 ai = OpenAIService()
-receipt_parser = OpenAIReceiptParsingService()
+receipt_intelligence = ReceiptIntelligenceService()
 
 # Default goal for MVP testing
 DEFAULT_GOAL = {
@@ -30,7 +41,22 @@ def dashboard():
     
     txs = load_transactions()
     goals = get_default_goals()
-    return render_template('dashboard.html', transactions=txs, goals=goals)
+    summaries = compute_dashboard_summaries(txs)
+    return render_template(
+        'dashboard.html',
+        transactions=txs,
+        goals=goals,
+        summaries=summaries,
+        category_label=category_label,
+    )
+
+
+@bp.route('/uploads/<path:filename>')
+def serve_upload(filename):
+    upload_dir = os.path.join(
+        os.path.dirname(__file__), '..', '..', config.get('upload.folder', 'uploads')
+    )
+    return send_from_directory(upload_dir, filename)
 
 
 @bp.route('/upload_receipt', methods=['GET', 'POST'])
@@ -76,19 +102,89 @@ def upload_receipt():
             flash('Failed to save receipt', 'error')
             return redirect(url_for('main.upload_receipt'))
         
-        # Parse receipt using OpenAI
-        parsed = receipt_parser.parse_receipt_image(path)
-        txs = load_transactions()
-        tx = normalize_transaction(parsed)
-        txs.append(tx)
-        if save_transactions(txs):
-            log_info(f"Receipt parsed and transaction created: {parsed.get('merchant', 'unknown')} - ${parsed.get('amount', '0.00')}")
-            flash(f"Receipt parsed: {parsed.get('merchant', 'Receipt')} - ${parsed.get('amount', '0.00')}", 'success')
-        else:
-            flash('Receipt parsed but failed to save transaction', 'warning')
-        return redirect(url_for('main.dashboard'))
+        upload_folder = config.get('upload.folder', 'uploads')
+        source_image = f"{upload_folder}/{filename}"
+        result = receipt_intelligence.process_upload(path, source_image)
+
+        if result['auto_commit']:
+            txs = load_transactions()
+            txs.append(result['transaction'])
+            if save_transactions(txs):
+                save_receipt_archive(result['header'])
+                n = len(result.get('line_items') or [])
+                flash(
+                    f"Receipt saved: {result['header']['merchant']} - "
+                    f"${result['header']['total']} ({n} line items)",
+                    'success',
+                )
+            else:
+                flash('Receipt parsed but failed to save transaction', 'warning')
+            return redirect(url_for('main.dashboard'))
+
+        if save_pending_receipt(result['pending']):
+            flash(
+                'Receipt needs review before saving. Please confirm extracted details.',
+                'warning',
+            )
+            return redirect(url_for('main.receipt_review', receipt_id=result['receipt_id']))
+        flash('Failed to queue receipt for review', 'error')
+        return redirect(url_for('main.upload_receipt'))
     
     return render_template('upload_receipt.html')
+
+
+def _commit_receipt_transaction(header, transaction):
+    txs = load_transactions()
+    txs.append(transaction)
+    if not save_transactions(txs):
+        return False
+    save_receipt_archive(header)
+    return True
+
+
+@bp.route('/receipt_review/<receipt_id>', methods=['GET', 'POST'])
+def receipt_review(receipt_id):
+    if not current_app.config.get('PREFLIGHT_SUCCESS'):
+        flash('Application preflight validation failed', 'error')
+        return redirect(url_for('main.dashboard'))
+
+    pending = get_pending_receipt(receipt_id)
+    if not pending:
+        flash('Receipt review session not found or already processed.', 'warning')
+        return redirect(url_for('main.dashboard'))
+
+    if request.method == 'POST':
+        action = request.form.get('action', 'confirm')
+        if action == 'discard':
+            remove_pending_receipt(receipt_id)
+            flash('Receipt discarded.', 'info')
+            return redirect(url_for('main.dashboard'))
+
+        header, transaction = receipt_intelligence.confirm_pending(pending, request.form)
+        if _commit_receipt_transaction(header, transaction):
+            remove_pending_receipt(receipt_id)
+            flash(
+                f"Receipt confirmed: {header['merchant']} - ${header['total']}",
+                'success',
+            )
+            return redirect(url_for('main.dashboard'))
+        flash('Failed to save confirmed receipt', 'error')
+
+    header = pending.get('header') or {}
+    line_items = pending.get('line_items') or []
+    upload_folder = config.get('upload.folder', 'uploads')
+    image_name = (header.get('source_image') or '').split('/')[-1]
+    image_url = f"/{upload_folder}/{image_name}" if image_name else None
+    categories = [(slug, category_label(slug)) for slug in CATEGORY_SLUGS if slug != 'uncategorized']
+
+    return render_template(
+        'receipt_review.html',
+        header=header,
+        line_items=line_items,
+        image_url=image_url,
+        categories=categories,
+        payment_methods=['cash', 'credit', 'debit', 'unknown'],
+    )
 
 
 @bp.route('/upload_csv', methods=['GET', 'POST'])
@@ -207,5 +303,13 @@ def insights():
         return redirect(url_for('main.dashboard'))
     
     txs = load_transactions()
-    insight_text = ai.generate_insights(txs) if txs else 'No transactions to analyze.'
-    return render_template('insights.html', insights=insight_text)
+    insight_text = (
+        ai.generate_insights(txs) if txs else 'No transactions to analyze.'
+    )
+    summaries = compute_dashboard_summaries(txs)
+    return render_template(
+        'insights.html',
+        insights=insight_text,
+        summaries=summaries,
+        category_label=category_label,
+    )

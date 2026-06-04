@@ -1,6 +1,7 @@
 import os
 import base64
 import json
+import uuid
 from app.utils.config_manager import config
 from app.utils.logging_service import ErrorCategory, log_error, log_info
 from app.utils.openai_key import load_openai_api_key
@@ -82,6 +83,134 @@ class OpenAIReceiptParsingService:
             )
             return None
 
+    def _vision_prompt_text(self):
+        return """Analyze this receipt image and extract the following information in JSON format:
+{
+  "merchant": "",
+  "date": "",
+  "subtotal": 0.0,
+  "tax": 0.0,
+  "tip": 0.0,
+  "total": 0.0,
+  "payment_method": "",
+  "currency": "USD",
+  "category": "",
+  "confidence": "high",
+  "raw_summary": "",
+  "items": [
+    {
+      "name": "",
+      "quantity": 1,
+      "unit_price": 0.0,
+      "line_total": 0.0,
+      "category": "",
+      "category_confidence": "high",
+      "is_discount": false
+    }
+  ]
+}
+
+Return ONLY valid JSON.
+Do not include markdown.
+Do not include code fences.
+Do not include explanation outside JSON.
+If a field is unknown, use an empty string, 0.0, empty list, or \"low\"."""
+
+    def parse_receipt_structured(self, file_path):
+        """Parse receipt and return full structured payload for Receipt Intelligence."""
+        receipt_id = str(uuid.uuid4())
+        if not os.path.exists(file_path):
+            msg = log_error(ErrorCategory.FILE_UPLOAD_ERROR, f"Receipt file not found: {file_path}")
+            fb = self._fallback_structured(file_path, msg, receipt_id)
+            return fb
+
+        try:
+            file_size_mb = os.path.getsize(file_path) / (1024 * 1024)
+            max_size = config.get('upload.max_size_mb', 10)
+            if file_size_mb > max_size:
+                msg = log_error(ErrorCategory.FILE_UPLOAD_ERROR, f"Receipt file too large: {file_size_mb:.1f}MB")
+                return self._fallback_structured(file_path, msg, receipt_id)
+        except Exception as e:
+            log_error(ErrorCategory.FILE_UPLOAD_ERROR, "Failed to check file size", e)
+
+        try:
+            with open(file_path, 'rb') as fh:
+                image_data = base64.standard_b64encode(fh.read()).decode('utf-8')
+        except Exception as e:
+            msg = log_error(ErrorCategory.FILE_UPLOAD_ERROR, "Failed to read receipt image", e)
+            return self._fallback_structured(file_path, msg, receipt_id)
+
+        client = self._get_client()
+        if not client:
+            msg = "OpenAI API key not configured. Using fallback parsing."
+            log_error(ErrorCategory.API_KEY_ERROR, msg)
+            return self._fallback_structured(file_path, msg, receipt_id)
+
+        try:
+            _, ext = os.path.splitext(file_path)
+            ext = ext.lower().lstrip('.')
+            media_type_map = {
+                'png': 'image/png',
+                'jpg': 'image/jpeg',
+                'jpeg': 'image/jpeg',
+                'webp': 'image/webp',
+                'gif': 'image/gif',
+            }
+            media_type = media_type_map.get(ext, 'image/jpeg')
+
+            response = client.chat.completions.create(
+                model=self.model,
+                messages=[
+                    {
+                        "role": "user",
+                        "content": [
+                            {"type": "text", "text": self._vision_prompt_text()},
+                            {
+                                "type": "image_url",
+                                "image_url": {"url": f"data:{media_type};base64,{image_data}"},
+                            },
+                        ],
+                    }
+                ],
+                max_tokens=1200,
+            )
+
+            response_text = response.choices[0].message.content
+            parsed = self._safe_parse_json(response_text)
+            if not isinstance(parsed, dict):
+                msg = "OpenAI response did not contain valid JSON object"
+                log_error(ErrorCategory.VALIDATION_ERROR, msg)
+                return self._fallback_structured(file_path, msg, receipt_id)
+
+            parsed['receipt_id'] = receipt_id
+            parsed['is_fallback'] = False
+            if not parsed.get('items'):
+                parsed['items'] = []
+            log_info(f"Receipt structured parse OK: {parsed.get('merchant', 'unknown')}")
+            return parsed
+
+        except Exception as e:
+            msg = log_error(ErrorCategory.OPENAI_API_ERROR, "OpenAI API call failed", e)
+            return self._fallback_structured(file_path, msg, receipt_id)
+
+    def _fallback_structured(self, file_path, error_msg='', receipt_id=None):
+        return {
+            'receipt_id': receipt_id or str(uuid.uuid4()),
+            'merchant': os.path.basename(file_path),
+            'date': '',
+            'subtotal': 0.0,
+            'tax': 0.0,
+            'tip': 0.0,
+            'total': 0.0,
+            'payment_method': 'unknown',
+            'currency': 'USD',
+            'category': 'uncategorized',
+            'confidence': 'low',
+            'raw_summary': f'Fallback: {error_msg}' if error_msg else 'Fallback parsing',
+            'items': [],
+            'is_fallback': True,
+        }
+
     def parse_receipt_image(self, file_path):
         """Parse receipt image using OpenAI vision API (modern SDK).
         
@@ -89,7 +218,7 @@ class OpenAIReceiptParsingService:
             file_path: Path to receipt image file
             
         Returns:
-            dict with parsed transaction fields:
+            dict with parsed transaction fields (flat, backward compatible):
             {
                 'merchant': str,
                 'amount': str (float as string),
@@ -98,117 +227,25 @@ class OpenAIReceiptParsingService:
                 'note': str
             }
         """
-        if not os.path.exists(file_path):
-            msg = log_error(ErrorCategory.FILE_UPLOAD_ERROR, f"Receipt file not found: {file_path}")
-            return self._fallback_transaction(file_path, msg)
-        
-        # Check file size
-        try:
-            file_size_mb = os.path.getsize(file_path) / (1024 * 1024)
-            max_size = config.get('upload.max_size_mb', 10)
-            if file_size_mb > max_size:
-                msg = log_error(ErrorCategory.FILE_UPLOAD_ERROR, f"Receipt file too large: {file_size_mb:.1f}MB")
-                return self._fallback_transaction(file_path, msg)
-        except Exception as e:
-            log_error(ErrorCategory.FILE_UPLOAD_ERROR, "Failed to check file size", e)
-        
-        # Read and encode image
-        try:
-            with open(file_path, 'rb') as fh:
-                image_data = base64.standard_b64encode(fh.read()).decode('utf-8')
-        except Exception as e:
-            msg = log_error(ErrorCategory.FILE_UPLOAD_ERROR, "Failed to read receipt image", e)
-            return self._fallback_transaction(file_path, msg)
-        
-        # Call OpenAI API
-        client = self._get_client()
-        if not client:
-            msg = "OpenAI API key not configured. Using fallback parsing."
-            log_error(ErrorCategory.API_KEY_ERROR, msg)
-            return self._fallback_transaction(file_path, msg)
-        
-        try:
-            # Determine image type from filename
-            _, ext = os.path.splitext(file_path)
-            ext = ext.lower().lstrip('.')
-            media_type_map = {
-                'png': 'image/png',
-                'jpg': 'image/jpeg',
-                'jpeg': 'image/jpeg',
-                'webp': 'image/webp',
-                'gif': 'image/gif'
-            }
-            media_type = media_type_map.get(ext, 'image/jpeg')
-            
-            # Call OpenAI ChatCompletion with vision using modern SDK
-            response = client.chat.completions.create(
-                model=self.model,
-                messages=[
-                    {
-                        "role": "user",
-                        "content": [
-                            {
-                                "type": "text",
-                                "text": """Analyze this receipt image and extract the following information in JSON format:
-{
-  "merchant": "",
-  "date": "",
-  "total": 0.0,
-  "category": "",
-  "items": [],
-  "confidence": "",
-  "raw_summary": ""
-}
+        structured = self.parse_receipt_structured(file_path)
+        return self._structured_to_flat(structured, file_path)
 
-Return ONLY valid JSON.
-Do not include markdown.
-Do not include code fences.
-Do not include explanation outside JSON.
-If a field is unknown, use an empty string, 0.0, empty list, or \"low\"."""
-                            },
-                            {
-                                "type": "image_url",
-                                "image_url": {
-                                    "url": f"data:{media_type};base64,{image_data}"
-                                }
-                            }
-                        ]
-                    }
-                ],
-                max_tokens=500
-            )
-            
-            # Parse response using modern SDK response object
-            response_text = response.choices[0].message.content
-            parsed = self._safe_parse_json(response_text)
-            if not isinstance(parsed, dict):
-                msg = "OpenAI response did not contain valid JSON object"
-                log_error(ErrorCategory.VALIDATION_ERROR, msg)
+    def _structured_to_flat(self, parsed, file_path):
+        if parsed.get('is_fallback') and parsed.get('total', 0) in (0, 0.0, '0', '0.0', '0.00'):
+            if not parsed.get('merchant') or parsed.get('merchant') == os.path.basename(file_path):
+                msg = parsed.get('raw_summary', '')
                 return self._fallback_transaction(file_path, msg)
 
-            log_info(f"Receipt parsed successfully via OpenAI: {parsed.get('merchant', 'unknown')}")
-            
-            # Normalize parsed data
-            raw_amount = parsed.get('total', parsed.get('amount', '0.00'))
-            amount_str = str(raw_amount).strip() if raw_amount is not None else '0.00'
-            if not amount_str:
-                amount_str = '0.00'
+        from app.utils.receipt_normalize import _money
 
-            return {
-                'merchant': str(parsed.get('merchant', '')).strip(),
-                'amount': amount_str,
-                'date': str(parsed.get('date', '')).strip(),
-                'category': str(parsed.get('category', 'other')).strip().lower() or 'other',
-                'note': str(parsed.get('raw_summary', f"OpenAI parsed: {os.path.basename(file_path)}")).strip()
-            }
-        
-        except json.JSONDecodeError as e:
-            msg = log_error(ErrorCategory.VALIDATION_ERROR, "Failed to parse OpenAI response as JSON", e)
-            return self._fallback_transaction(file_path, msg)
-        
-        except Exception as e:
-            msg = log_error(ErrorCategory.OPENAI_API_ERROR, "OpenAI API call failed", e)
-            return self._fallback_transaction(file_path, msg)
+        amount_str = _money(parsed.get('total', parsed.get('amount', 0)))
+        return {
+            'merchant': str(parsed.get('merchant', '')).strip(),
+            'amount': amount_str,
+            'date': str(parsed.get('date', '')).strip(),
+            'category': str(parsed.get('category', 'other')).strip().lower() or 'other',
+            'note': str(parsed.get('raw_summary', f"OpenAI parsed: {os.path.basename(file_path)}")).strip(),
+        }
 
     def _fallback_transaction(self, file_path, error_msg=''):
         """Return minimal fallback transaction when parsing fails."""

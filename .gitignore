@@ -7,6 +7,8 @@ uploads/
 *.csv
 data/transactions.json
 data/goals.json
+data/receipts.json
+data/receipts_pending.json
 logs/
 __pycache__/
 *.pyc

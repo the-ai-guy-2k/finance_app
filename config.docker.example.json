@@ -14,5 +14,10 @@
   },
   "data": {
     "folder": "data"
+  },
+  "receipt_intelligence": {
+    "auto_create_min_confidence": "high",
+    "review_required_confidence": ["low", "medium"],
+    "amount_mismatch_tolerance": 0.05
   }
 }
