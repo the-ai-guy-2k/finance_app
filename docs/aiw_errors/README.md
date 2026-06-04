@@ -105,7 +105,7 @@ Current CI/CD flow for SPE-01:
 ```
 feature branch / pull request
   → ci.yml (syntax, tests, Docker build validation — no push)
-  → merge to main
+  → merge to deployable
   → docker-publish.yml
   → tests
   → Docker build
@@ -116,7 +116,7 @@ feature branch / pull request
 **Docker Hub Target**: `taig2k/finance_app_for_aws`
 
 **Required Tags**:
-- `latest` (points to most recent build from `main`)
+- `latest` (points to most recent build from `deployable`)
 - `<commit-sha>` (specific commit identifier)
 
 Legacy note: Earlier pipeline used `deployable` branch and `taig2k/financial-nebula-node`. Retired in CI/CD-02.

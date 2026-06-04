@@ -13,6 +13,7 @@ __pycache__/
 .pytest_cache/
 
 # Terraform (SPE-01) — never commit secrets or state
+*.pem
 terraform.tfvars
 *.tfstate
 *.tfstate.*

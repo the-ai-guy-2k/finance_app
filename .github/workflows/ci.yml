@@ -45,4 +45,4 @@ jobs:
         run: docker build -t finance_app_for_aws:ci-test .
 
       # Docker Hub publish is handled by .github/workflows/docker-publish.yml
-      # on push to main and manual workflow_dispatch only.
+      # on push to deployable and manual workflow_dispatch only.

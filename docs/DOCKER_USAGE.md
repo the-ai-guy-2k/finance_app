@@ -67,7 +67,7 @@ http://127.0.0.1:5000
 
 ## Docker Hub Image Tags
 
-- **`latest`**: Most recent image published from `main`
+- **`latest`**: Most recent image published from `deployable`
 - **Commit SHA**: Immutable tag per published commit (`taig2k/finance_app_for_aws:<commit-sha>`)
 
 Example:
@@ -83,12 +83,12 @@ Two GitHub Actions workflows share responsibility:
 | Workflow | Trigger | Purpose |
 |----------|---------|---------|
 | [`.github/workflows/ci.yml`](../.github/workflows/ci.yml) | Push, pull request | Syntax check, imports, pytest, local Docker build (no push) |
-| [`.github/workflows/docker-publish.yml`](../.github/workflows/docker-publish.yml) | Push to `main`, manual dispatch | Test, build, push to Docker Hub |
+| [`.github/workflows/docker-publish.yml`](../.github/workflows/docker-publish.yml) | Push to `deployable`, manual dispatch | Test, build, push to Docker Hub |
 
 - **Feature branches / PRs**: CI validates code and Docker build only — no Docker Hub push
 - **`main` branch**: `docker-publish.yml` runs tests, builds, and pushes `latest` + commit SHA tags
 
-Legacy note: An earlier pipeline published `taig2k/financial-nebula-node` from a `deployable` branch. That path was retired in favor of `taig2k/finance_app_for_aws` on `main` for SPE-01.
+**Release branch:** `deployable` — feature branches run CI only; merges to `deployable` trigger Docker Hub publish.
 
 ## Config file and secret handling
 

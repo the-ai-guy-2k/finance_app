@@ -81,14 +81,14 @@ Two workflows provide a single CI/CD story for SPE-01:
 | Workflow | File | Trigger | Purpose |
 |----------|------|---------|---------|
 | **CI** | [`.github/workflows/ci.yml`](.github/workflows/ci.yml) | Push, pull request | Syntax, imports, pytest, Docker build validation (no push) |
-| **Docker Publish** | [`.github/workflows/docker-publish.yml`](.github/workflows/docker-publish.yml) | Push to `main`, manual dispatch | Test, build, push to Docker Hub |
+| **Docker Publish** | [`.github/workflows/docker-publish.yml`](.github/workflows/docker-publish.yml) | Push to `deployable`, manual dispatch | Test, build, push to Docker Hub |
 
 | Item | Value |
 |------|-------|
 | **Purpose** | Build and push the Financial App image for AWS SPE-01 Terraform deployment |
 | **Docker Hub image** | `taig2k/finance_app_for_aws` |
 | **Tags pushed** | `latest`, `<commit-sha>` |
-| **Publish triggers** | Push to `main`, manual `workflow_dispatch` |
+| **Publish triggers** | Push to `deployable`, manual `workflow_dispatch` |
 | **Required GitHub secrets** | `DOCKERHUB_USERNAME`, `DOCKERHUB_TOKEN` |
 
 **Publish workflow behavior (`docker-publish.yml`):**
@@ -98,9 +98,9 @@ Two workflows provide a single CI/CD story for SPE-01:
 3. Builds the Docker image with Buildx
 4. Pushes `taig2k/finance_app_for_aws:latest` and `taig2k/finance_app_for_aws:<commit-sha>` to Docker Hub
 
-**SPE-01 relationship:** Terraform artifact [`terraform/spe-01/`](terraform/spe-01/) pulls `taig2k/finance_app_for_aws:latest` onto EC2 at bootstrap. Publish to Docker Hub from `main` before running SPE-01 `terraform apply`.
+**SPE-01 relationship:** Terraform artifact [`terraform/spe-01/`](terraform/spe-01/) pulls `taig2k/finance_app_for_aws:latest` onto EC2 at bootstrap. Publish to Docker Hub from `deployable` before running SPE-01 `terraform apply`.
 
-**Legacy cleanup (CI/CD-02):** Removed Docker Hub push from `ci.yml`. An earlier pipeline published `taig2k/financial-nebula-node` on merges to a `deployable` branch; that path is retired. `docker-publish.yml` on `main` is the sole publish path.
+**Release branch:** `deployable` is the protected branch for tested, publishable work. Feature branches merge to `deployable` after CI passes.
 
 Credentials are stored only as GitHub Actions secrets — never hardcoded in workflows or the repository.
 
