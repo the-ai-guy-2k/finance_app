@@ -5,6 +5,7 @@
 <section>
   <h3>Enter Transaction Details</h3>
   <form method="post">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
     <div>
       <label for="merchant">Merchant/Store Name:</label>
       <input type="text" id="merchant" name="merchant" required>

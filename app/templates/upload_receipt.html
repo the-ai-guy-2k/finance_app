@@ -5,6 +5,7 @@
 <section>
   <h3>Parse Receipt Image</h3>
   <form method="post" enctype="multipart/form-data">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
     <div>
       <label for="receipt">Select receipt image:</label>
       <input type="file" id="receipt" name="receipt" accept="image/*" required>

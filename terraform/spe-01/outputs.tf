@@ -32,3 +32,13 @@ output "docker_service_name" {
   description = "Systemd unit name for the container on the instance"
   value       = "financial-app.service"
 }
+
+output "openai_ssm_parameter_name" {
+  description = "SSM parameter path for OpenAI API key"
+  value       = var.openai_ssm_parameter_name
+}
+
+output "docker_image" {
+  description = "Pinned Docker image used by SPE-01 bootstrap"
+  value       = var.docker_image
+}

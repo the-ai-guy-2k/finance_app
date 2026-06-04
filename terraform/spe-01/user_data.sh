@@ -10,6 +10,8 @@ APP_DIR="/opt/financial-app"
 CONFIG_FILE="$APP_DIR/config.json"
 ENV_FILE="$APP_DIR/env"
 DOCKER_IMAGE="${docker_image}"
+AWS_REGION="${aws_region}"
+OPENAI_SSM_PARAMETER_NAME="${openai_ssm_parameter_name}"
 
 dnf update -y
 dnf install -y docker
@@ -26,7 +28,8 @@ cat > "$CONFIG_FILE" <<'EOF'
     "secret_key": "spe01-demo-secret-change-if-reused"
   },
   "openai": {
-    "model": "gpt-4o-mini"
+    "model": "gpt-4o-mini",
+    "ssm_parameter_name": "SSM_PARAMETER_NAME_PLACEHOLDER"
   },
   "upload": {
     "folder": "uploads",
@@ -39,25 +42,16 @@ cat > "$CONFIG_FILE" <<'EOF'
   }
 }
 EOF
-
+sed -i "s|SSM_PARAMETER_NAME_PLACEHOLDER|$OPENAI_SSM_PARAMETER_NAME|g" "$CONFIG_FILE"
 chmod 600 "$CONFIG_FILE"
 
-if [ -n "${openai_api_key_b64}" ]; then
-  decoded_key="$(echo "${openai_api_key_b64}" | base64 -d)"
-  printf 'OPENAI_API_KEY=%s\n' "$decoded_key" > "$ENV_FILE"
-  chmod 600 "$ENV_FILE"
-  unset decoded_key
-  echo "OpenAI API key written to $ENV_FILE from Terraform variable."
-else
-  cat > "$ENV_FILE" <<'EOF'
-# Set your OpenAI API key here, then restart the service:
-#   sudo systemctl restart financial-app
-OPENAI_API_KEY=
+cat > "$ENV_FILE" <<EOF
+OPENAI_SSM_PARAMETER_NAME=$OPENAI_SSM_PARAMETER_NAME
+AWS_REGION=$AWS_REGION
+AWS_DEFAULT_REGION=$AWS_REGION
 EOF
-  chmod 600 "$ENV_FILE"
-  echo "WARNING: OPENAI_API_KEY not provided at apply time."
-  echo "Operator must edit $ENV_FILE and restart financial-app.service."
-fi
+chmod 600 "$ENV_FILE"
+echo "OpenAI key will be loaded from SSM parameter: $OPENAI_SSM_PARAMETER_NAME (not stored in env file)."
 
 echo "Pulling Docker image: $DOCKER_IMAGE"
 docker pull "$DOCKER_IMAGE"
@@ -79,7 +73,9 @@ ExecStartPre=-/usr/bin/docker rm financial-app
 ExecStart=/usr/bin/docker run --name financial-app \\
   --rm \\
   -p 80:5000 \\
-  -e OPENAI_API_KEY \\
+  -e OPENAI_SSM_PARAMETER_NAME \\
+  -e AWS_REGION \\
+  -e AWS_DEFAULT_REGION \\
   -v $CONFIG_FILE:/app/config.json:ro \\
   -v $APP_DIR/data:/app/data \\
   -v $APP_DIR/uploads:/app/uploads \\

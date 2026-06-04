@@ -5,6 +5,7 @@
 <section>
   <h3>Import Transactions from CSV</h3>
   <form method="post" enctype="multipart/form-data">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
     <div>
       <label for="csvfile">Select CSV file:</label>
       <input type="file" id="csvfile" name="csvfile" accept=".csv" required>

@@ -66,9 +66,12 @@ resource "aws_instance" "spe01" {
   vpc_security_group_ids      = [aws_security_group.spe01.id]
   associate_public_ip_address = true
 
+  iam_instance_profile = aws_iam_instance_profile.spe01.name
+
   user_data = templatefile("${path.module}/user_data.sh", {
-    docker_image        = var.docker_image
-    openai_api_key_b64  = var.openai_api_key != "" ? base64encode(var.openai_api_key) : ""
+    docker_image              = var.docker_image
+    aws_region                = var.aws_region
+    openai_ssm_parameter_name = var.openai_ssm_parameter_name
   })
 
   user_data_replace_on_change = true
@@ -81,8 +84,9 @@ resource "aws_instance" "spe01" {
   }
 
   metadata_options {
-    http_endpoint = "enabled"
-    http_tokens   = "required"
+    http_endpoint               = "enabled"
+    http_tokens                 = "required"
+    http_put_response_hop_limit = 2
   }
 
   tags = merge(var.tags, {

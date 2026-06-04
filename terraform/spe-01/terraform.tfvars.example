@@ -7,26 +7,24 @@ aws_region  = "us-east-1"
 project_name = "financial-app"
 environment  = "spe-01"
 
-# Free-tier eligible instance type
-instance_type = "t2.micro"
-
-# Small root volume (gp3, encrypted)
-root_volume_size_gb = 8
+instance_type         = "t3.micro"
+root_volume_size_gb   = 30
 
 # Required: existing EC2 key pair name in us-east-1
 ssh_key_name = "your-ec2-key-pair-name"
 
-# Restrict SSH to your IP for better security (example: "203.0.113.10/32")
-ssh_allowed_cidrs = ["0.0.0.0/0"]
+# REQUIRED: operator public IP only (example — replace with your IP/32)
+# Chosen CIDR for documentation: single-operator home/office egress
+ssh_allowed_cidrs = ["203.0.113.10/32"]
 
-# HTTP access for demo (0.0.0.0/0 allows any browser)
+# HTTP access for demo (browser access)
 http_allowed_cidrs = ["0.0.0.0/0"]
 
-# Docker Hub image published from deployable via docker-publish.yml
-docker_image = "taig2k/finance_app_for_aws:latest"
+# Pinned image from deployable publish (update SHA after each release)
+docker_image = "taig2k/finance_app_for_aws:89a4ea50348c73a8fcaf47c95ad7fb24a803d16d"
 
-# Do NOT put your OpenAI API key in this file.
-# Pass at apply time instead:
+openai_ssm_parameter_name = "/financial-app/spe-01/openai_api_key"
+
+# Pass at apply time only (creates SSM SecureString; not written to user-data):
 #   export TF_VAR_openai_api_key="sk-..."
-# or:
-#   terraform apply -var="openai_api_key=sk-..."
+#   terraform apply -var-file=terraform.tfvars

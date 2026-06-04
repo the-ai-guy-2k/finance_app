@@ -46,15 +46,35 @@ variable "http_allowed_cidrs" {
 }
 
 variable "ssh_allowed_cidrs" {
-  description = "CIDR blocks allowed to reach the instance on SSH port 22"
+  description = "CIDR blocks allowed for SSH (operator IP only; must not be 0.0.0.0/0)"
   type        = list(string)
-  default     = ["0.0.0.0/0"]
+
+  validation {
+    condition     = length(var.ssh_allowed_cidrs) > 0
+    error_message = "ssh_allowed_cidrs must include at least one operator CIDR (e.g. 203.0.113.10/32)."
+  }
+
+  validation {
+    condition     = !contains(var.ssh_allowed_cidrs, "0.0.0.0/0")
+    error_message = "ssh_allowed_cidrs must not include 0.0.0.0/0. Set your operator public IP /32."
+  }
 }
 
 variable "docker_image" {
-  description = "Docker Hub image to run the Financial App"
+  description = "Docker Hub image with exact tag or digest (no latest)"
   type        = string
-  default     = "taig2k/finance_app_for_aws:latest"
+  default     = "taig2k/finance_app_for_aws:89a4ea50348c73a8fcaf47c95ad7fb24a803d16d"
+
+  validation {
+    condition     = !strcontains(var.docker_image, ":latest")
+    error_message = "docker_image must use a pinned SHA tag, not :latest."
+  }
+}
+
+variable "openai_ssm_parameter_name" {
+  description = "SSM Parameter Store path for OpenAI API key (SecureString)"
+  type        = string
+  default     = "/financial-app/spe-01/openai_api_key"
 }
 
 variable "openai_api_key" {

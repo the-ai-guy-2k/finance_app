@@ -18,6 +18,7 @@
   </ul>
 
   <form method="post" onsubmit="return confirm('Reset all demo data? This cannot be undone.');">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
     <div>
       <label>
         <input type="checkbox" name="confirm" value="yes" required>

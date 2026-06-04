@@ -20,13 +20,27 @@ def ok(name, passed, detail=""):
     print(f"[{status}] {name}: {detail}")
 
 
+def extract_csrf(html):
+    match = re.search(r'name="csrf_token"[^>]*value="([^"]+)"', html)
+    return match.group(1) if match else None
+
+
+def post_with_csrf(path, data=None, files=None):
+    page = SESSION.get(path, timeout=30)
+    token = extract_csrf(page.text)
+    payload = dict(data or {})
+    if token:
+        payload['csrf_token'] = token
+    return SESSION.post(path, data=payload, files=files, allow_redirects=True, timeout=120)
+
+
 # 1. Reachability
 try:
     r = SESSION.get(f"{BASE}/", timeout=30)
     ok("reachability", r.status_code == 200, f"GET / -> {r.status_code}")
 except Exception as e:
     ok("reachability", False, str(e))
-    print_summary()
+    print("\n=== SUMMARY ===")
     sys.exit(1)
 
 # 2. Dashboard
@@ -40,21 +54,19 @@ ok(
 # 3. Transaction entry
 merchant = "PE01_Validation_Merchant"
 try:
-    r = SESSION.post(
+    post_with_csrf(
         f"{BASE}/add_transaction",
-        data={
+        {
             "merchant": merchant,
             "amount": "42.50",
             "category": "validation",
             "date": "2026-06-04",
             "note": "ACI-PE-01 test transaction",
         },
-        allow_redirects=True,
-        timeout=30,
     )
     dash = SESSION.get(f"{BASE}/", timeout=30)
     found = merchant in dash.text
-    ok("transaction", r.status_code == 200 and found, f"merchant visible={found}")
+    ok("transaction", dash.status_code == 200 and found, f"merchant visible={found}")
 except Exception as e:
     ok("transaction", False, str(e))
 
@@ -65,8 +77,17 @@ png = (
     b"\x00\x00\x05\x00\x01\r\n-\xb4\x00\x00\x00\x00IEND\xaeB`\x82"
 )
 try:
+    page = SESSION.get(f"{BASE}/upload_receipt", timeout=30)
+    token = extract_csrf(page.text)
     files = {"receipt": ("pe01_test.png", BytesIO(png), "image/png")}
-    r = SESSION.post(f"{BASE}/upload_receipt", files=files, allow_redirects=True, timeout=120)
+    data = {"csrf_token": token} if token else {}
+    r = SESSION.post(
+        f"{BASE}/upload_receipt",
+        data=data,
+        files=files,
+        allow_redirects=True,
+        timeout=120,
+    )
     ok("receipt_upload", r.status_code == 200, f"POST upload_receipt -> {r.status_code}")
 except Exception as e:
     ok("receipt_upload", False, str(e))
@@ -76,7 +97,6 @@ try:
     r = SESSION.get(f"{BASE}/insights", timeout=120)
     text = r.text
     heuristic = "heuristic" in text.lower() or "Full insights require OpenAI" in text
-    openai_hint = "Behavioral" in text or "spending" in text.lower()
     ok(
         "ai_insights",
         r.status_code == 200 and not heuristic,
@@ -89,9 +109,10 @@ except Exception as e:
 try:
     r = SESSION.get(f"{BASE}/demo_reset", timeout=30)
     has_form = "confirm" in r.text and "Reset Demo Data" in r.text
+    token = extract_csrf(r.text)
     r2 = SESSION.post(
         f"{BASE}/demo_reset",
-        data={"confirm": "yes"},
+        data={"confirm": "yes", "csrf_token": token} if token else {"confirm": "yes"},
         allow_redirects=True,
         timeout=30,
     )
@@ -108,15 +129,9 @@ except Exception as e:
 
 # 7. Post-reset transaction (usability)
 try:
-    r = SESSION.post(
+    post_with_csrf(
         f"{BASE}/add_transaction",
-        data={
-            "merchant": "PE01_PostReset",
-            "amount": "1.00",
-            "category": "test",
-        },
-        allow_redirects=True,
-        timeout=30,
+        {"merchant": "PE01_PostReset", "amount": "1.00", "category": "test"},
     )
     dash = SESSION.get(f"{BASE}/", timeout=30)
     ok(
@@ -126,6 +141,18 @@ try:
     )
 except Exception as e:
     ok("post_reset_usability", False, str(e))
+
+# 8. CSRF enforcement smoke test
+try:
+    r = SESSION.post(
+        f"{BASE}/add_transaction",
+        data={"merchant": "NoCSRF", "amount": "1.00"},
+        allow_redirects=False,
+        timeout=30,
+    )
+    ok("csrf_enforced", r.status_code == 400, f"bare POST -> {r.status_code}")
+except Exception as e:
+    ok("csrf_enforced", False, str(e))
 
 print("\n=== SUMMARY ===")
 all_pass = all(v["pass"] for v in RESULTS.values())

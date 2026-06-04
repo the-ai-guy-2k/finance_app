@@ -22,6 +22,19 @@ def test_load_falls_back_to_file(monkeypatch, tmp_path):
 
 def test_load_returns_none_when_unavailable(monkeypatch):
     monkeypatch.delenv('OPENAI_API_KEY', raising=False)
+    monkeypatch.delenv('OPENAI_SSM_PARAMETER_NAME', raising=False)
     with patch('app.utils.openai_key.config') as mock_config:
         mock_config.get.return_value = None
         assert load_openai_api_key() is None
+
+
+def test_load_from_ssm(monkeypatch):
+    monkeypatch.delenv('OPENAI_API_KEY', raising=False)
+    monkeypatch.setenv('OPENAI_SSM_PARAMETER_NAME', '/financial-app/spe-01/openai_api_key')
+    with patch('app.utils.openai_key.config') as mock_config:
+        mock_config.get.return_value = None
+        with patch('boto3.client') as mock_boto:
+            mock_boto.return_value.get_parameter.return_value = {
+                'Parameter': {'Value': 'sk-ssm-test-key'}
+            }
+            assert load_openai_api_key() == 'sk-ssm-test-key'

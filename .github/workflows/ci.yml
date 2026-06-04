@@ -30,7 +30,9 @@ jobs:
           python -m py_compile app/utils/normalize.py
           python -m py_compile app/utils/config_manager.py
           python -m py_compile app/utils/preflight.py
+          python -m py_compile app/utils/openai_key.py
           python -m py_compile app/utils/logging_service.py
+          python -m py_compile gunicorn.conf.py
 
       - name: Import check
         run: |

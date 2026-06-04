@@ -1,5 +1,6 @@
 import os
 from flask import Flask
+from flask_wtf.csrf import CSRFProtect
 from app.utils.config_manager import config
 from app.utils.preflight import validate_preflight
 from app.utils.logging_service import setup_logger, log_info, log_error, ErrorCategory
@@ -25,6 +26,7 @@ app = Flask(
     template_folder=_template_path(),
     static_folder=_static_path(),
 )
+CSRFProtect(app)
 
 # Set Flask secret key from config
 secret = config.get('flask.secret_key', 'theaiguyfreakout')

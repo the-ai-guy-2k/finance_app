@@ -21,7 +21,7 @@ def validate_preflight():
     if not load_openai_api_key():
         msg = log_error(
             ErrorCategory.API_KEY_ERROR,
-            "OpenAI API key unavailable: set OPENAI_API_KEY or a valid openai.api_key_file in config.json",
+            "OpenAI API key unavailable: set OPENAI_API_KEY, OPENAI_SSM_PARAMETER_NAME, or openai.api_key_file in config.json",
         )
         errors.append(msg)
     
