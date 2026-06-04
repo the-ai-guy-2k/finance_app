@@ -1,6 +1,7 @@
-import os
 from app.utils.config_manager import config
 from app.utils.logging_service import ErrorCategory, log_error, log_info
+from app.utils.openai_key import load_openai_api_key
+import os
 
 
 def validate_preflight():
@@ -17,33 +18,12 @@ def validate_preflight():
         msg = log_error(ErrorCategory.CONFIG_ERROR, "Flask secret_key missing from config.json")
         errors.append(msg)
     
-    # Check OpenAI API key path or environment variable
-    env_key = os.getenv('OPENAI_API_KEY')
-    api_key_file = config.get('openai.api_key_file')
-    if env_key:
-        if env_key.strip():
-            log_info("OpenAI API key loaded from OPENAI_API_KEY environment variable")
-        else:
-            msg = log_error(ErrorCategory.API_KEY_ERROR, "OPENAI_API_KEY is set but empty")
-            errors.append(msg)
-    elif not api_key_file:
-        msg = log_error(ErrorCategory.API_KEY_ERROR, "openai.api_key_file path missing from config.json")
+    if not load_openai_api_key():
+        msg = log_error(
+            ErrorCategory.API_KEY_ERROR,
+            "OpenAI API key unavailable: set OPENAI_API_KEY or a valid openai.api_key_file in config.json",
+        )
         errors.append(msg)
-    elif not os.path.exists(api_key_file):
-        msg = log_error(ErrorCategory.API_KEY_ERROR, f"OpenAI API key file not found: {api_key_file}")
-        errors.append(msg)
-    else:
-        try:
-            with open(api_key_file, 'r', encoding='utf-8') as fh:
-                key = fh.read().strip()
-                if not key:
-                    msg = log_error(ErrorCategory.API_KEY_ERROR, f"OpenAI API key file is empty: {api_key_file}")
-                    errors.append(msg)
-                else:
-                    log_info(f"OpenAI API key loaded from {api_key_file}")
-        except Exception as e:
-            msg = log_error(ErrorCategory.API_KEY_ERROR, f"Failed to read API key file", e)
-            errors.append(msg)
     
     # Check data folder exists
     data_folder = config.get('data.folder', 'data')

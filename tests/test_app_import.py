@@ -29,6 +29,7 @@ def test_routes_available():
         assert '/' in str(routes)
         assert any('upload_receipt' in r for r in routes)
         assert any('upload_csv' in r for r in routes)
+        assert any('demo_reset' in r for r in routes)
 
 
 def test_preflight_validation():

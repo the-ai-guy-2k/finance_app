@@ -3,6 +3,7 @@ import base64
 import json
 from app.utils.config_manager import config
 from app.utils.logging_service import ErrorCategory, log_error, log_info
+from app.utils.openai_key import load_openai_api_key
 
 
 class OpenAIReceiptParsingService:
@@ -17,32 +18,9 @@ class OpenAIReceiptParsingService:
     """
 
     def __init__(self):
-        self.api_key = None
+        self.api_key = load_openai_api_key()
         self.model = config.get('openai.model', 'gpt-4o-mini')
-        api_key_file = config.get('openai.api_key_file')
         self._client = None
-        self._load_api_key(api_key_file)
-
-    def _load_api_key(self, api_key_file):
-        """Load and validate OpenAI API key from file."""
-        if not api_key_file:
-            log_error(ErrorCategory.API_KEY_ERROR, "OpenAI API key file path not in config")
-            return
-        
-        if not os.path.exists(api_key_file):
-            log_error(ErrorCategory.API_KEY_ERROR, f"OpenAI API key file not found: {api_key_file}")
-            return
-        
-        try:
-            with open(api_key_file, 'r', encoding='utf-8') as fh:
-                self.api_key = fh.read().strip()
-            if not self.api_key:
-                log_error(ErrorCategory.API_KEY_ERROR, "OpenAI API key file is empty")
-                self.api_key = None
-            else:
-                log_info("OpenAI API key loaded successfully")
-        except Exception as e:
-            log_error(ErrorCategory.API_KEY_ERROR, "Failed to read OpenAI API key file", e)
 
     def _get_client(self):
         """Lazy-load modern OpenAI client (SDK v1.0+)."""

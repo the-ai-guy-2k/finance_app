@@ -13,8 +13,10 @@ Behavior-aware financial operational intelligence.
 
 2. **Configure:**
    - Ensure `config.json` exists with your settings
-   - Place your OpenAI API key file at the path specified in `config.json`
-   - Default: `C:\Users\tim\Desktop\openai_key_for_financial_app.txt`
+   - **OpenAI API key** (first match wins):
+     1. Environment variable `OPENAI_API_KEY` (recommended for Docker and AWS)
+     2. File at `openai.api_key_file` in `config.json` (local fallback)
+   - Never commit API keys to the repository
 
 3. **Run:**
    ```powershell
@@ -31,12 +33,21 @@ Behavior-aware financial operational intelligence.
 - Behavioral insight generation via OpenAI
 - Simple goal correlation
 - Local JSON persistence
+- **Demo Reset** — clear transactions, uploads, and demo logs for a fresh demo (nav: Demo Reset; confirmation required)
+
+## Demo Reset
+
+Use **Demo Reset** in the navigation when you need a clean slate for demonstrations or validation.
+
+- Requires checkbox confirmation and a browser confirm dialog
+- Clears: `data/transactions.json`, files in the uploads folder, optional `data/goals.json`, `logs/app.log`
+- Preserves: `config.json`, source code, Terraform, and deployment artifacts
 
 ## Configuration
 
 See `config.json` for:
 - Flask secret key
-- OpenAI API key file path
+- OpenAI API key file path (fallback when `OPENAI_API_KEY` is not set)
 - OpenAI model selection
 - Upload folder location
 - Upload file size limits

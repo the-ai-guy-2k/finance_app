@@ -94,8 +94,9 @@ Two GitHub Actions workflows share responsibility:
 
 - Do not bake `config.json` or any API key file into the Docker image
 - Mount `config.docker.json` to `/app/config.json` inside the container
-- Mount the OpenAI key file to `/run/secrets/openai_key.txt` inside the container
-- The app also supports environment variables `CONFIG_FILE`, `OPENAI_API_KEY_FILE`, and `OPENAI_API_KEY`
+- **Preferred:** set `OPENAI_API_KEY` at runtime (Docker `-e`, AWS user-data/Terraform)
+- **Fallback:** mount the key file to `/run/secrets/openai_key.txt` and point `openai.api_key_file` in mounted config to that path
+- Other supported env vars: `CONFIG_FILE`, `OPENAI_API_KEY_FILE`
 
 ### Example `config.docker.json`
 

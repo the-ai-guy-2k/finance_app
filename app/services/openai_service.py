@@ -1,76 +1,44 @@
-import os
 import json
 from app.utils.config_manager import config
 from app.utils.logging_service import ErrorCategory, log_error, log_info
+from app.utils.openai_key import load_openai_api_key
+
 
 class OpenAIService:
-    """Minimal OpenAI service abstraction for MVP.
-
-    Loads API key from path specified in config.json.
-    Methods are safe no-ops when API key or `openai` package is missing.
-    """
+    """OpenAI service for behavioral insights."""
 
     def __init__(self):
-        self.api_key = os.getenv('OPENAI_API_KEY')
+        self.api_key = load_openai_api_key()
         self.model = config.get('openai.model', 'gpt-4o-mini')
-
-        if self.api_key:
-            self.api_key = self.api_key.strip()
-            log_info("OpenAI API key loaded from OPENAI_API_KEY environment variable")
-        else:
-            api_key_file = config.get('openai.api_key_file')
-            if api_key_file and os.path.exists(api_key_file):
-                try:
-                    with open(api_key_file, 'r', encoding='utf-8') as fh:
-                        self.api_key = fh.read().strip()
-                    log_info(f"OpenAI API key loaded from config path")
-                except Exception as e:
-                    log_error(ErrorCategory.API_KEY_ERROR, "Failed to load OpenAI API key", e)
-
         self._client = None
 
-    def _has_client(self):
+    def _get_client(self):
         if self._client is not None:
-            return True
+            return self._client
+        if not self.api_key:
+            return None
         try:
-            import openai
-            if self.api_key:
-                openai.api_key = self.api_key
-            self._client = openai
-            return True
-        except Exception:
-            return False
+            from openai import OpenAI
+            self._client = OpenAI(api_key=self.api_key)
+            return self._client
+        except Exception as e:
+            log_error(ErrorCategory.OPENAI_API_ERROR, "Failed to initialize OpenAI client", e)
+            return None
 
     def parse_receipt(self, file_path_or_bytes):
-        """Parse receipt image and return transaction dict.
-        
-        In MVP, this is a placeholder. In future, sends image to OpenAI vision API.
-        """
-        if self._has_client() and self.api_key:
-            try:
-                # Placeholder: in future, use vision API
-                return {
-                    'amount': '0.00',
-                    'merchant': os.path.basename(str(file_path_or_bytes)),
-                    'category': 'unknown',
-                    'date': '',
-                    'note': 'Parsed from receipt (placeholder)'
-                }
-            except Exception as e:
-                log_error(ErrorCategory.OPENAI_API_ERROR, "Receipt parsing failed", e)
-        
-        # Fallback
+        """Legacy placeholder; receipt parsing uses OpenAIReceiptParsingService."""
         return {
             'amount': '0.00',
-            'merchant': os.path.basename(str(file_path_or_bytes)),
+            'merchant': 'Receipt',
             'category': 'unknown',
             'date': '',
-            'note': 'Receipt file uploaded (AI parsing unavailable)'
+            'note': 'Use upload receipt flow for AI parsing',
         }
 
     def generate_insights(self, transactions):
         """Generate behavioral insights from transactions using OpenAI or heuristics."""
-        if self._has_client() and self.api_key:
+        client = self._get_client()
+        if client and self.api_key:
             try:
                 prompt = f"""Generate brief behavioral financial insights from these transactions (max 200 words):
 {json.dumps(transactions)[:4000]}
@@ -79,19 +47,18 @@ Focus on:
 - spending patterns
 - behavioral observations
 - actionable insights"""
-                
-                resp = self._client.ChatCompletion.create(
+
+                response = client.chat.completions.create(
                     model=self.model,
                     messages=[{"role": "user", "content": prompt}],
-                    max_tokens=300
+                    max_tokens=300,
                 )
-                insight = resp.choices[0].message.content.strip()
+                insight = response.choices[0].message.content.strip()
                 log_info("Behavioral insights generated via OpenAI")
                 return insight
             except Exception as e:
                 log_error(ErrorCategory.OPENAI_API_ERROR, "Insight generation failed", e)
-        
-        # Simple heuristic fallback
+
         total = 0.0
         count = 0
         categories = {}
@@ -104,15 +71,14 @@ Focus on:
                 categories[cat] = categories.get(cat, 0) + 1
             except Exception:
                 continue
-        
+
         avg = (total / count) if count else 0
         top_cat = max(categories, key=categories.get) if categories else 'none'
-        
-        insight = f"""Financial Overview (heuristic):
+
+        return f"""Financial Overview (heuristic):
 - Transactions: {count}
 - Total: ${total:.2f}
 - Average: ${avg:.2f}
 - Top category: {top_cat}
 
 Note: Full insights require OpenAI API access."""
-        return insight

@@ -1,0 +1,31 @@
+{% extends 'base.html' %}
+{% block content %}
+<h2>Demo Reset</h2>
+
+<section>
+  <p>Reset demo runtime data for a clean demonstration. This does <strong>not</strong> change application code, configuration, or deployment files.</p>
+  <h3>What will be cleared</h3>
+  <ul>
+    <li>All saved transactions</li>
+    <li>Uploaded receipt and CSV files in the uploads folder</li>
+    <li>Optional <code>data/goals.json</code> if present</li>
+    <li>Application log file (<code>logs/app.log</code>)</li>
+  </ul>
+  <h3>What is preserved</h3>
+  <ul>
+    <li><code>config.json</code> and environment settings</li>
+    <li>Source code and Terraform artifacts</li>
+  </ul>
+
+  <form method="post" onsubmit="return confirm('Reset all demo data? This cannot be undone.');">
+    <div>
+      <label>
+        <input type="checkbox" name="confirm" value="yes" required>
+        I understand this will permanently delete demo transactions and uploads.
+      </label>
+    </div>
+    <button type="submit" class="danger-button">Reset Demo Data</button>
+    <a href="{{ url_for('main.dashboard') }}">Cancel</a>
+  </form>
+</section>
+{% endblock %}

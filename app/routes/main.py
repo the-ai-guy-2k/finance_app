@@ -1,7 +1,7 @@
 from flask import Blueprint, render_template, request, redirect, url_for, flash, current_app
 from werkzeug.utils import secure_filename
 import os
-from app.utils.storage import load_transactions, save_transactions, get_default_goals
+from app.utils.storage import load_transactions, save_transactions, get_default_goals, reset_demo_data
 from app.utils.normalize import normalize_transaction
 from app.utils.config_manager import config
 from app.services.openai_service import OpenAIService
@@ -181,6 +181,23 @@ def add_transaction():
         return redirect(url_for('main.dashboard'))
     
     return render_template('add_transaction.html')
+
+
+@bp.route('/demo_reset', methods=['GET', 'POST'])
+def demo_reset():
+    if request.method == 'POST':
+        if request.form.get('confirm') != 'yes':
+            flash('Confirmation required. Check the box to proceed.', 'warning')
+            return redirect(url_for('main.demo_reset'))
+        upload_folder = config.get('upload.folder', 'uploads')
+        summary = reset_demo_data(upload_folder)
+        log_info(f"Demo reset completed: {summary}")
+        flash(
+            'Demo data reset. Transactions, uploads, and demo logs cleared. Configuration unchanged.',
+            'success',
+        )
+        return redirect(url_for('main.dashboard'))
+    return render_template('demo_reset.html')
 
 
 @bp.route('/insights')
