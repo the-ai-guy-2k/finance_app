@@ -1,10 +1,17 @@
 import pytest
 
 
-def test_csrf_blocks_post_without_token(client, app):
-    """State-changing POST must include CSRF token when protection is enabled."""
+def _enable_csrf_test_mode(app):
+    """CSRF route tests must reach handlers; preflight may fail on CI without a local key file."""
     app.config['TESTING'] = False
     app.config['WTF_CSRF_ENABLED'] = True
+    app.config['PREFLIGHT_SUCCESS'] = True
+    app.config['PREFLIGHT_ERRORS'] = []
+
+
+def test_csrf_blocks_post_without_token(client, app):
+    """State-changing POST must include CSRF token when protection is enabled."""
+    _enable_csrf_test_mode(app)
     response = client.post(
         '/add_transaction',
         data={'merchant': 'Test', 'amount': '10.00', 'category': 'food'},
@@ -13,8 +20,7 @@ def test_csrf_blocks_post_without_token(client, app):
 
 
 def test_csrf_allows_post_with_token(client, app):
-    app.config['TESTING'] = False
-    app.config['WTF_CSRF_ENABLED'] = True
+    _enable_csrf_test_mode(app)
     page = client.get('/add_transaction')
     assert page.status_code == 200
     token = None

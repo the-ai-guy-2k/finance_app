@@ -41,6 +41,8 @@ jobs:
           python -c "from app.services import OpenAIService; print('services import ok')"
 
       - name: Run tests
+        env:
+          OPENAI_API_KEY: sk-ci-test-placeholder
         run: pytest tests/ -v
 
       - name: Validate Docker build
