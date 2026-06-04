@@ -119,7 +119,7 @@ Existing ignores retained for secrets (`terraform.tfvars`, `*.pem`, `.env`), run
 ## 6. Commit and Push
 
 - **Message:** `ACI-PA-05: repository hygiene and state reconciliation`
-- **SHA:** `62c517d72e9473e3465a730d4161f9204f307dd8`
+- **SHA:** `b0ef777f424bd3fba913d84aba225299f8b09cf6`
 - **Push:** `origin/deployable`
 
 ---
