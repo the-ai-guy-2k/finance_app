@@ -14,6 +14,22 @@
   </section>
 {% endif %}
 
+{% if summaries and summaries.behavioral_rows %}
+  <section class="summary-panel" style="margin-bottom: 1rem; padding: 1rem; background: #faf5ff; border-radius: 8px; border: 1px solid #ddd6fe;">
+    <h3>Receipt behavioral context</h3>
+    <ul>
+      {% for row in summaries.behavioral_rows[:8] %}
+        <li>
+          <strong>{{ row.merchant }}</strong> — ${{ row.amount }}
+          · {{ trip_type_label(row.trip_type) if trip_type_label is defined else row.trip_type }}
+          · {{ essential_label(row.essential_classification) if essential_label is defined else row.essential_classification }}
+          {% if row.narrative_short %}<em>({{ row.narrative_short }})</em>{% endif %}
+        </li>
+      {% endfor %}
+    </ul>
+  </section>
+{% endif %}
+
 <section>
   <h3>Analysis</h3>
   {% if insights %}

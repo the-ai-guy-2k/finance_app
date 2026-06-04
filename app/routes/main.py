@@ -15,6 +15,7 @@ from app.utils.normalize import normalize_transaction
 from app.utils.config_manager import config
 from app.utils.dashboard_stats import compute_dashboard_summaries
 from app.utils.receipt_categories import CATEGORY_SLUGS, category_label
+from app.utils.behavioral_normalize import trip_type_label, essential_label
 from app.services.openai_service import OpenAIService
 from app.services.receipt_intelligence_service import ReceiptIntelligenceService
 from app.utils.logging_service import log_error, log_info, ErrorCategory
@@ -48,6 +49,8 @@ def dashboard():
         goals=goals,
         summaries=summaries,
         category_label=category_label,
+        trip_type_label=trip_type_label,
+        essential_label=essential_label,
     )
 
 
@@ -108,7 +111,8 @@ def upload_receipt():
 
         if result['auto_commit']:
             txs = load_transactions()
-            txs.append(result['transaction'])
+            tx = receipt_intelligence.attach_behavioral(result['transaction'], txs)
+            txs.append(tx)
             if save_transactions(txs):
                 save_receipt_archive(result['header'])
                 n = len(result.get('line_items') or [])
@@ -135,7 +139,8 @@ def upload_receipt():
 
 def _commit_receipt_transaction(header, transaction):
     txs = load_transactions()
-    txs.append(transaction)
+    tx = receipt_intelligence.attach_behavioral(transaction, txs)
+    txs.append(tx)
     if not save_transactions(txs):
         return False
     save_receipt_archive(header)
@@ -312,4 +317,6 @@ def insights():
         insights=insight_text,
         summaries=summaries,
         category_label=category_label,
+        trip_type_label=trip_type_label,
+        essential_label=essential_label,
     )

@@ -1,5 +1,8 @@
 import os
 from app.services.openai_receipt_service import OpenAIReceiptParsingService
+from app.services.behavioral_receipt_intelligence_service import (
+    BehavioralReceiptIntelligenceService,
+)
 from app.utils.receipt_normalize import (
     normalize_receipt_header,
     build_line_items,
@@ -14,8 +17,13 @@ from app.utils.logging_service import log_info
 class ReceiptIntelligenceService:
     """Orchestrate receipt parse, categorization, confidence gate, and transaction build."""
 
-    def __init__(self, parser=None):
+    def __init__(self, parser=None, behavioral=None):
         self.parser = parser or OpenAIReceiptParsingService()
+        self.behavioral = behavioral or BehavioralReceiptIntelligenceService()
+
+    def attach_behavioral(self, transaction, all_transactions=None):
+        """Apply v2 behavioral_meta before persisting a receipt transaction."""
+        return self.behavioral.enrich_transaction(transaction, all_transactions=all_transactions)
 
     def process_upload(self, file_path, source_image):
         """

@@ -18,6 +18,12 @@
         <span class="summary-label">Receipt spend</span>
         <span class="summary-value">${{ "%.2f"|format(summaries.receipt_spend) }}</span>
       </div>
+      {% if summaries.behavioral_receipt_count %}
+      <div class="summary-card">
+        <span class="summary-label">Behavioral receipts</span>
+        <span class="summary-value">{{ summaries.behavioral_receipt_count }}</span>
+      </div>
+      {% endif %}
     </div>
     {% if summaries.category_rows %}
       <h4>By category</h4>
@@ -56,6 +62,7 @@
             <th>Merchant</th>
             <th>Category</th>
             <th>Amount</th>
+            <th>Behavior</th>
             <th>Source</th>
             <th>Note</th>
           </tr>
@@ -69,6 +76,19 @@
                 <span class="category-badge">{{ category_label(t.category) if category_label is defined else t.category }}</span>
               </td>
               <td class="amount-cell">${{ "%.2f"|format(t.amount|float) if t.amount else '0.00' }}</td>
+              <td class="behavior-cell">
+                {% if t.behavioral_meta %}
+                  {% set bm = t.behavioral_meta %}
+                  {% set trip = bm.trip.trip_type if bm.trip else 'unknown' %}
+                  {% set ess = bm.essential.classification if bm.essential else 'unknown' %}
+                  <span class="trip-badge" title="Trip type">{{ trip_type_label(trip) if trip_type_label is defined else trip }}</span>
+                  <span class="essential-badge essential-{{ ess }}" title="Essential classification">{{ essential_label(ess) if essential_label is defined else ess }}</span>
+                {% elif t.source == 'receipt' %}
+                  <span class="behavior-muted">v1 only</span>
+                {% else %}
+                  —
+                {% endif %}
+              </td>
               <td>
                 {% if t.source == 'receipt' %}
                   <span class="category-badge">Receipt{% if t.line_items %} ({{ t.line_items|length }} items){% endif %}</span>
@@ -78,6 +98,30 @@
               </td>
               <td class="note-cell">{{ t.note or '—' }}</td>
             </tr>
+            {% if t.behavioral_meta and t.behavioral_meta.summary %}
+            <tr class="behavioral-summary-row">
+              <td colspan="7">
+                <div class="behavioral-summary-panel">
+                  <strong>Behavioral summary</strong>
+                  <p class="narrative-short">{{ t.behavioral_meta.summary.narrative_short or '' }}</p>
+                  <dl class="summary-dl">
+                    <dt>What happened</dt><dd>{{ t.behavioral_meta.summary.what_happened }}</dd>
+                    <dt>Why</dt><dd>{{ t.behavioral_meta.summary.why }}</dd>
+                    <dt>Is it normal?</dt><dd>{{ t.behavioral_meta.summary.is_it_normal }}</dd>
+                    <dt>Is it beneficial?</dt><dd>{{ t.behavioral_meta.summary.is_it_beneficial }}</dd>
+                    <dt>Could it improve?</dt><dd>{{ t.behavioral_meta.summary.could_it_improve }}</dd>
+                  </dl>
+                  {% if t.behavioral_meta.savings and t.behavioral_meta.savings.opportunities %}
+                  <ul class="savings-hints">
+                    {% for opp in t.behavioral_meta.savings.opportunities %}
+                      <li>{{ opp.message }}</li>
+                    {% endfor %}
+                  </ul>
+                  {% endif %}
+                </div>
+              </td>
+            </tr>
+            {% endif %}
           {% endfor %}
         </tbody>
       </table>
@@ -135,6 +179,77 @@
   border-radius: 12px;
   font-size: 0.85rem;
   font-weight: 500;
+}
+
+.trip-badge {
+  display: inline-block;
+  background: #dbeafe;
+  color: #1d4ed8;
+  padding: 0.2rem 0.6rem;
+  border-radius: 10px;
+  font-size: 0.8rem;
+  margin-right: 0.25rem;
+}
+
+.essential-badge {
+  display: inline-block;
+  padding: 0.2rem 0.6rem;
+  border-radius: 10px;
+  font-size: 0.8rem;
+  font-weight: 500;
+}
+
+.essential-essential { background: #d1fae5; color: #065f46; }
+.essential-non_essential { background: #fee2e2; color: #991b1b; }
+.essential-discretionary { background: #fef3c7; color: #92400e; }
+.essential-mixed { background: #e9d5ff; color: #6b21a8; }
+.essential-unknown { background: #f3f4f6; color: #4b5563; }
+
+.behavior-muted {
+  font-size: 0.8rem;
+  color: #9ca3af;
+}
+
+.behavioral-summary-row td {
+  background: #faf5ff;
+  border-top: none;
+  padding-top: 0;
+}
+
+.behavioral-summary-panel {
+  padding: 0.75rem 1rem;
+  border-left: 3px solid #7c3aed;
+  margin: 0.25rem 0 0.75rem 0;
+}
+
+.behavioral-summary-panel .narrative-short {
+  font-weight: 600;
+  color: #5b21b6;
+  margin: 0.25rem 0 0.5rem 0;
+}
+
+.summary-dl {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 0.25rem 0.75rem;
+  font-size: 0.85rem;
+  margin: 0.5rem 0;
+}
+
+.summary-dl dt {
+  font-weight: 600;
+  color: #6b7280;
+}
+
+.summary-dl dd {
+  margin: 0;
+  color: #374151;
+}
+
+.savings-hints {
+  margin: 0.5rem 0 0 1rem;
+  font-size: 0.85rem;
+  color: #b45309;
 }
 
 .amount-cell {

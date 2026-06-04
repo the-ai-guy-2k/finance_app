@@ -19,5 +19,11 @@
     "auto_create_min_confidence": "high",
     "review_required_confidence": ["low", "medium"],
     "amount_mismatch_tolerance": 0.05
+  },
+  "behavioral_intelligence": {
+    "essential_threshold_high": 0.75,
+    "essential_threshold_low": 0.35,
+    "mixed_spread_threshold": 0.40,
+    "history_window_days": 90
   }
 }

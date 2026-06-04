@@ -57,13 +57,17 @@ Line-item category totals (from receipts):
 Receipt summaries:
 {json.dumps(context.get('receipt_summaries', []))[:1500]}
 
+Behavioral receipt intelligence (v2):
+{json.dumps(context.get('behavioral_summaries', []))[:1200]}
+
 Total spend: {context.get('total_spend', 0)}
 Receipt count: {context.get('receipt_count', 0)}
 
 Focus on:
 - spending patterns by category
 - receipt vs manual entry patterns
-- behavioral observations
+- trip types, essential vs non-essential patterns, savings opportunities
+- behavioral observations from receipt intelligence v2
 - actionable insights"""
 
                 response = client.chat.completions.create(
@@ -87,12 +91,21 @@ Focus on:
         top_cat = max(categories, key=categories.get) if categories else 'none'
         top_line = max(line_cats, key=line_cats.get) if line_cats else 'none'
 
+        behavioral = context.get('behavioral_summaries', [])
+        behavioral_note = ''
+        if behavioral:
+            trips = [b.get('trip_type') for b in behavioral if b.get('trip_type')]
+            behavioral_note = (
+                f"\n- Receipts with behavioral analysis: {len(behavioral)}"
+                f"\n- Recent trip types: {', '.join(trips[:5]) or 'n/a'}"
+            )
+
         return f"""Financial Overview (heuristic):
 - Transactions: {count}
 - Total: ${total:.2f}
 - Average: ${avg:.2f}
 - Top category: {top_cat}
 - Receipt-derived transactions: {receipt_count}
-- Top line-item category: {top_line}
+- Top line-item category: {top_line}{behavioral_note}
 
 Note: Full insights require OpenAI API access."""
