@@ -11,6 +11,7 @@ resource "aws_ssm_parameter" "openai_api_key" {
 }
 
 resource "aws_iam_role" "spe01_ec2" {
+  count = var.enable_ec2_iam_ssm ? 1 : 0
   name = "${var.project_name}-${var.environment}-ec2-role"
 
   assume_role_policy = jsonencode({
@@ -30,8 +31,9 @@ resource "aws_iam_role" "spe01_ec2" {
 }
 
 resource "aws_iam_role_policy" "spe01_ssm_read" {
+  count = var.enable_ec2_iam_ssm ? 1 : 0
   name = "${var.project_name}-${var.environment}-ssm-openai-read"
-  role = aws_iam_role.spe01_ec2.id
+  role = aws_iam_role.spe01_ec2[0].id
 
   policy = jsonencode({
     Version = "2012-10-17"
@@ -49,6 +51,7 @@ resource "aws_iam_role_policy" "spe01_ssm_read" {
 }
 
 resource "aws_iam_instance_profile" "spe01" {
+  count = var.enable_ec2_iam_ssm ? 1 : 0
   name = "${var.project_name}-${var.environment}-instance-profile"
-  role = aws_iam_role.spe01_ec2.name
+  role = aws_iam_role.spe01_ec2[0].name
 }

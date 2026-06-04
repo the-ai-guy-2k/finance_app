@@ -2,6 +2,7 @@
 
 **Report ID:** ACI-IOR-00  
 **Timestamp:** 2026-06-03  
+**Governance commit:** `9fbd19b` — ACI-IOR-00: establish deployable branch governance  
 **Mission:** Establish `deployable` as protected release branch for IOR feature work
 
 ---
@@ -31,7 +32,8 @@ Local and remote release branch governance updated from **`main`** to **`deploya
 |-------|------------------|
 | Remote URL | `https://github.com/the-ai-guy-2k/finance_app.git` |
 | Push `deployable` | `git push -u origin deployable` |
-| Verify ref | `git ls-remote origin refs/heads/deployable` |
+| Verify ref | `9fbd19ba65f17bb390140e36f656d9349e7e4556` → `refs/heads/deployable` |
+| Remote `main` still exists | `8d0118dd11aec118a3dff2a614d3b351ac6e1dd3` (not deleted) |
 
 ---
 

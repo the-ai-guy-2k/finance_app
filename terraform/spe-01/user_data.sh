@@ -12,6 +12,7 @@ ENV_FILE="$APP_DIR/env"
 DOCKER_IMAGE="${docker_image}"
 AWS_REGION="${aws_region}"
 OPENAI_SSM_PARAMETER_NAME="${openai_ssm_parameter_name}"
+BOOTSTRAP_OPENAI_API_KEY="${bootstrap_openai_api_key}"
 
 dnf update -y
 dnf install -y docker
@@ -51,7 +52,12 @@ AWS_REGION=$AWS_REGION
 AWS_DEFAULT_REGION=$AWS_REGION
 EOF
 chmod 600 "$ENV_FILE"
-echo "OpenAI key will be loaded from SSM parameter: $OPENAI_SSM_PARAMETER_NAME (not stored in env file)."
+if [ -n "$BOOTSTRAP_OPENAI_API_KEY" ]; then
+  echo "OPENAI_API_KEY=$BOOTSTRAP_OPENAI_API_KEY" >> "$ENV_FILE"
+  echo "OpenAI key supplied via bootstrap env (IAM/SSM instance profile unavailable)."
+else
+  echo "OpenAI key will be loaded from SSM parameter: $OPENAI_SSM_PARAMETER_NAME (not stored in env file)."
+fi
 
 echo "Pulling Docker image: $DOCKER_IMAGE"
 docker pull "$DOCKER_IMAGE"
@@ -74,6 +80,7 @@ ExecStart=/usr/bin/docker run --name financial-app \\
   --rm \\
   -p 80:5000 \\
   -e OPENAI_SSM_PARAMETER_NAME \\
+  -e OPENAI_API_KEY \\
   -e AWS_REGION \\
   -e AWS_DEFAULT_REGION \\
   -v $CONFIG_FILE:/app/config.json:ro \\

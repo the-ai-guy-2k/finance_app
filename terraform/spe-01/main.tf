@@ -66,12 +66,13 @@ resource "aws_instance" "spe01" {
   vpc_security_group_ids      = [aws_security_group.spe01.id]
   associate_public_ip_address = true
 
-  iam_instance_profile = aws_iam_instance_profile.spe01.name
+  iam_instance_profile = var.enable_ec2_iam_ssm ? aws_iam_instance_profile.spe01[0].name : null
 
   user_data = templatefile("${path.module}/user_data.sh", {
     docker_image              = var.docker_image
     aws_region                = var.aws_region
     openai_ssm_parameter_name = var.openai_ssm_parameter_name
+    bootstrap_openai_api_key  = var.enable_ec2_iam_ssm ? "" : var.openai_api_key
   })
 
   user_data_replace_on_change = true

@@ -84,6 +84,12 @@ variable "openai_api_key" {
   default     = ""
 }
 
+variable "enable_ec2_iam_ssm" {
+  description = "Attach IAM instance profile for SSM key reads. Set false if the deployer lacks iam:CreateRole (uses OPENAI_API_KEY in bootstrap env instead)."
+  type        = bool
+  default     = true
+}
+
 variable "tags" {
   description = "Additional tags applied to all resources"
   type        = map(string)
